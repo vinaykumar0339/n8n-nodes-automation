@@ -48,6 +48,7 @@
     "n8n-workflow": "*"
   },
   "dependencies": {
+    "csvtojson": "^2.0.10",
     "webdriverio": "^9.18.4"
   }
 }

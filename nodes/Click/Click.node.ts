@@ -1,4 +1,5 @@
 import { ApplicationError, IExecuteFunctions, INodeExecutionData, INodeType, INodeTypeDescription, NodeConnectionType, NodeExecutionWithMetadata } from "n8n-workflow";
+import { ElementIdentifier, elementSelectProperties } from "../../utils";
 
 export class Click implements INodeType {
     description: INodeTypeDescription = {
@@ -14,78 +15,34 @@ export class Click implements INodeType {
         inputs: [NodeConnectionType.Main],
         outputs: [NodeConnectionType.Main],
         properties: [
-            // Android properties
-            {
-                displayName: "Android Selector Type",
-                name: "androidSelectorType",
-                type: "options",
-                placeholder: "Select Android selector type",
-                required: true,
-                options: [
-                    { name: "Class Name", value: "className" },
-                    { name: "CSS Selector", value: "css" },
-                    { name: "ID", value: "id" },
-                    { name: "Tag Name", value: "tagName" },
-                    { name: "XPath", value: "xpath" }
-                ],
-                default: "id",
-                description: "How to select the element on Android",
-            },
-            {
-                displayName: "Android Selector Value",
-                name: "androidSelectorValue",
-                type: "string",
-                required: true,
-                placeholder: "Enter Android selector value",
-                default: "",
-                description: "Value for the selected Android selector type",
-            },
-            // iOS properties
-            {
-                displayName: "iOS Selector Type",
-                name: "iosSelectorType",
-                required: true,
-                placeholder: "Select iOS selector type",
-                type: "options",
-                options: [
-                    { name: "Accessibility ID", value: "accessibilityId" },
-                    { name: "Class Name", value: "className" },
-                    { name: "ID", value: "id" },
-                    { name: "XPath", value: "xpath" }
-                ],
-                default: "accessibilityId",
-                description: "How to select the element on iOS",
-            },
-            {
-                displayName: "iOS Selector Value",
-                name: "iosSelectorValue",
-                required: true,
-                placeholder: "Enter iOS selector value",
-                type: "string",
-                default: "",
-                description: "Value for the selected iOS selector type",
-            }
+            ...elementSelectProperties
         ],
     }
 
     async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][] | NodeExecutionWithMetadata[][] | null> {
         const flowContext = this.getContext('flow');
         const appiumDriver = flowContext.appiumDriver as WebdriverIO.Browser;
+        const elementSelectorsById = flowContext.elementSelectorsById as Record<string, ElementIdentifier>;
 
         if (!appiumDriver) {
             throw new ApplicationError("Appium driver is not initialized. Please run the Driver Init node first.");
         }
-        const androidSelectorType = this.getNodeParameter("androidSelectorType", 0) as string;
-        const androidSelectorValue = this.getNodeParameter("androidSelectorValue", 0) as string;
-        const iosSelectorType = this.getNodeParameter("iosSelectorType", 0) as string;
-        const iosSelectorValue = this.getNodeParameter("iosSelectorValue", 0) as string;
+        const elementSelectorId = this.getNodeParameter("elementSelectorId", 0) as string;
+        const elementSelector = elementSelectorsById[elementSelectorId];
+        if (!elementSelector) {
+            throw new ApplicationError(`Element selector not found: ${elementSelectorId} Please ensure the Driver Init node has been executed and the element selector ID is correct.`);
+        }
+        const androidSelectorType = elementSelector.androidSelectorType;
+        const androidSelectorValue = elementSelector.androidSelectorValue;
+        const iosSelectorType = elementSelector.iosSelectorType;
+        const iosSelectorValue = elementSelector.iosSelectorValue;
         const isAndroid = appiumDriver.isAndroid;
         const selectorType = isAndroid ? androidSelectorType : iosSelectorType;
         const selectorValue = isAndroid ? androidSelectorValue : iosSelectorValue;
 
         let element;
         if (selectorType == "xpath") {
-            element = appiumDriver.$(`//${selectorValue}`);
+            element = appiumDriver.$(`${selectorValue}`);
         } else if (selectorType == "css") {
             element = appiumDriver.$(`${selectorValue}`);
         } else if (selectorType == "id") {
